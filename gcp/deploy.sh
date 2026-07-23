@@ -55,6 +55,18 @@ gcloud compute ssh "$INSTANCE_NAME" --zone="$ZONE" --project="$PROJECT" --comman
       -subj "/CN=droidstream"
   fi
 
+  # Admin token (opt-in "see/attach to every session" mode -- see
+  # control-plane/src/index.js isAdmin() and web/app.js). Generated once and
+  # kept in a .env file docker compose loads automatically from this same
+  # directory; never in the repo (gitignored) and never hardcoded in
+  # docker-compose.yml (this repo is public).
+  if [ ! -f .env ] || ! grep -q "^ADMIN_TOKEN=" .env; then
+    echo "ADMIN_TOKEN=$(openssl rand -hex 24)" >> .env
+  fi
+  echo ""
+  echo "Admin token (paste into the web console'"'"'s \"admin token\" field to see/attach to every session):"
+  grep "^ADMIN_TOKEN=" .env
+
   sudo docker compose up --build -d
   sleep 5
   sudo docker compose ps

@@ -242,6 +242,42 @@ for occasional/bursty use; for constant use, either lower
 `IDLE_TIMEOUT_MS` expectations accordingly or poll `/api/health` from
 outside periodically to keep a session warm.
 
+## Admin mode: seeing/attaching to every session
+
+By design, a session's access token is only ever seen by the browser tab
+that created it (`GET /api/sessions*` never includes it) — that's the
+app's entire access-control model, per `docs/DEPLOYMENT.md`. This means a
+different tab, a different browser, or a session created via `curl`/
+`json-bridge` shows up in the list as unreachable ("No access token — This
+browser did not start that session").
+
+`deploy.sh` now generates a random `ADMIN_TOKEN` on the VM on first deploy
+(kept in `.env` next to `docker-compose.yml`, **never committed** — this
+repo is public — and never hardcoded into `docker-compose.yml` itself,
+which references it as `${ADMIN_TOKEN:-}`). It's printed at the end of
+`deploy.sh`'s output; retrieve it again any time with:
+
+```bash
+gcloud compute ssh droidstream --zone=us-east1-c --project=droidstream-svc \
+  --command='grep ADMIN_TOKEN /opt/droidstream/.env'
+```
+
+Paste it into the **"admin token"** field in the web console's top bar
+(persisted in that browser's `localStorage`, so it's a one-time setup per
+browser). Once set, every request for the session list includes an
+`X-Admin-Token` header; the control plane (`control-plane/src/index.js`,
+`isAdmin()`) only ever includes the real `token` field in its response
+when that header matches, and the browser silently adopts it into
+`sessionStorage` the same way it does for sessions it created itself —
+after that, tapping *any* session in the list attaches normally.
+
+Verified: `GET /api/sessions/:id` omits `token` with no header and with a
+wrong header, includes the correct one only when `X-Admin-Token` matches.
+
+Empty `ADMIN_TOKEN` (the default if you don't run `deploy.sh`'s generation
+step, e.g. a manual `docker compose up`) disables the feature entirely —
+`isAdmin()` requires a non-empty configured token before comparing.
+
 ## Known gaps (from `docs/DEPLOYMENT.md`, worth repeating here)
 
 - **No authentication beyond per-session tokens.** Anyone who can reach

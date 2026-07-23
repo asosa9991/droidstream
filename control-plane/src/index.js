@@ -12,6 +12,19 @@ app.use(express.static(config.webRoot, { maxAge: '1h', index: 'index.html' }));
 
 const manager = new SessionManager();
 
+// Session tokens are otherwise the whole auth model (see docs/DEPLOYMENT.md)
+// -- a session's token is normally only ever seen by the browser tab that
+// created it. This is a deliberate, off-by-default escape hatch: with
+// ADMIN_TOKEN configured server-side, a caller that presents it back gets
+// every session's real token too, letting one browser (or operator tool)
+// see and attach to sessions it didn't start itself.
+function isAdmin(req) {
+  return Boolean(config.adminToken) && req.get('x-admin-token') === config.adminToken;
+}
+function sessionJson(session, admin) {
+  return admin ? { ...session.toJSON(), token: session.token } : session.toJSON();
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
@@ -36,7 +49,10 @@ app.get('/api/capabilities', (_req, res) => {
   });
 });
 
-app.get('/api/sessions', (_req, res) => res.json({ sessions: manager.list() }));
+app.get('/api/sessions', (req, res) => {
+  const admin = isAdmin(req);
+  res.json({ sessions: [...manager.sessions.values()].map((s) => sessionJson(s, admin)) });
+});
 
 app.post('/api/sessions', async (req, res) => {
   try {
@@ -54,7 +70,7 @@ app.post('/api/sessions', async (req, res) => {
 app.get('/api/sessions/:id', (req, res) => {
   const session = manager.get(req.params.id);
   if (!session) return res.status(404).json({ error: 'no session with that id' });
-  res.json(session.toJSON());
+  res.json(sessionJson(session, isAdmin(req)));
 });
 
 app.get('/api/sessions/:id/logs', async (req, res) => {

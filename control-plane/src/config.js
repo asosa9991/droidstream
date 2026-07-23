@@ -71,4 +71,9 @@ export const config = {
     tablet: { width: 1200, height: 1920, dpi: 240 },
   },
   defaultProfile: process.env.DEFAULT_PROFILE ?? 'phone',
+
+  // Unset by default -- the admin-visibility feature (seeing/attaching to
+  // sessions this browser didn't create) is entirely disabled unless this
+  // is explicitly configured. See docs/PROTOCOL.md and index.js's isAdmin().
+  adminToken: process.env.ADMIN_TOKEN || null,
 };

@@ -28,6 +28,10 @@ services:
       # dropdown to phone-hd in web/app.js) and anything that creates a
       # session without specifying a profile, e.g. json-bridge.
       DEFAULT_PROFILE: phone-hd
+      # Off by default (empty = feature disabled). Set in a .env file next
+      # to this compose file, generated fresh on the VM by gcp/deploy.sh --
+      # never hardcode a real value here, this repo is public.
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
       # Auto-detection (config.js autoBackend()) checks for /dev/binderfs
       # inside the control-plane's OWN container, which never reflects host
       # capability -- it's always false there even when the host (verified

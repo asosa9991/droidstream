@@ -10,7 +10,28 @@ const els = {
   viewport: $('viewport'), screen: $('screen'), signal: $('signal'),
   mResolution: $('mResolution'), mFps: $('mFps'), mBitrate: $('mBitrate'), mRtt: $('mRtt'), mDropped: $('mDropped'),
   btnRotate: $('btnRotate'), btnNotifications: $('btnNotifications'), btnStop: $('btnStop'),
+  adminToken: $('adminToken'),
 };
+
+// ---------------------------------------------------------------- admin mode
+//
+// Normally a session's token is only ever seen by the browser tab that
+// created it (see attachTo()) -- that's the app's whole access-control
+// model. If the control plane was started with ADMIN_TOKEN set, presenting
+// it back via this header makes /api/sessions* include every session's
+// real token too, so this browser can see and attach to sessions it
+// didn't start itself. Off unless both sides opt in.
+function adminHeaders() {
+  const t = localStorage.getItem('droidstream:adminToken');
+  return t ? { 'x-admin-token': t } : {};
+}
+els.adminToken.value = localStorage.getItem('droidstream:adminToken') ?? '';
+els.adminToken.addEventListener('change', () => {
+  const v = els.adminToken.value.trim();
+  if (v) localStorage.setItem('droidstream:adminToken', v);
+  else localStorage.removeItem('droidstream:adminToken');
+  refreshSessions();
+});
 
 const FRAME_VIDEO = 0x01;
 const FLAG_CONFIG = 0x01;
@@ -66,9 +87,17 @@ async function pollHealth() {
 async function refreshSessions() {
   let sessions = [];
   try {
-    ({ sessions } = await (await fetch('/api/sessions')).json());
+    ({ sessions } = await (await fetch('/api/sessions', { headers: adminHeaders() })).json());
   } catch {
     return;
+  }
+
+  // Admin mode: the server only includes `token` when x-admin-token matched.
+  // Adopt it the same way startSession() does, so attachTo() (which only
+  // ever looks in sessionStorage) works unmodified for sessions this
+  // browser tab didn't create itself.
+  for (const s of sessions) {
+    if (s.token) sessionStorage.setItem(`token:${s.id}`, s.token);
   }
 
   els.sessionCount.textContent = String(sessions.length);
