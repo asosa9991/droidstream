@@ -5,12 +5,22 @@
 */
 
 :root {
+  /* Light (default). Bench chrome only -- the device well below is always
+     dark regardless of page theme (a phone screen is a bright emissive
+     object; it reads best against a dark surround either way), so --well
+     and --well-edge, plus everything styled directly against them
+     (.stage, .device, .navbtn, .telemetry, ...), are intentionally not
+     part of the light/dark swap at all. */
   --bench:      #E7E9E1;
   --bench-deep: #D8DBD1;
   --paper:      #F4F5F0;
+  --surface:    #FFFFFF; /* form controls: selects, etc. */
   --ink:        #14181B;
   --ink-soft:   #5A625F;
   --rule:       #C3C8BC;
+
+  --tint-warn:  #F7F2E2;
+  --tint-error: #F8EAE8;
 
   --well:       #191D20;
   --well-edge:  #2B3136;
@@ -26,6 +36,51 @@
 
   --rail-h: 52px;
 }
+
+/* Dark: mirrors the light palette's roles (paper stays the *elevated*
+   surface, bench-deep stays the *recessed* one) rather than a naive
+   invert. System preference is the default signal; an explicit
+   data-theme (set by the toggle button, see app.js) wins either way. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bench:      #16191A;
+    --bench-deep: #0E1011;
+    --paper:      #1E2224;
+    --surface:    #242829;
+    --ink:        #E7E9E1;
+    --ink-soft:   #8B9490;
+    --rule:       #33383A;
+
+    --tint-warn:  #3A331D;
+    --tint-error: #3A2320;
+
+    --cobalt:     #6C8CFF;
+    --moss:       #5FB050;
+    --ochre:      #D9A441;
+    --alarm:      #E2574A;
+  }
+}
+:root[data-theme="dark"] {
+  --bench:      #16191A;
+  --bench-deep: #0E1011;
+  --paper:      #1E2224;
+  --surface:    #242829;
+  --ink:        #E7E9E1;
+  --ink-soft:   #8B9490;
+  --rule:       #33383A;
+
+  --tint-warn:  #3A331D;
+  --tint-error: #3A2320;
+
+  --cobalt:     #6C8CFF;
+  --moss:       #5FB050;
+  --ochre:      #D9A441;
+  --alarm:      #E2574A;
+}
+
+html { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"]  { color-scheme: dark; }
 
 * { box-sizing: border-box; }
 
@@ -100,6 +155,20 @@ body {
 .admin-token:focus { outline: none; border-color: var(--cobalt); }
 .admin-token:not(:placeholder-shown) { border-color: var(--moss); }
 
+.theme-toggle {
+  width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color .12s ease, border-color .12s ease;
+}
+.theme-toggle:hover { color: var(--ink); border-color: var(--ink-soft); }
+.theme-toggle:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+
 .rail__state {
   display: flex;
   align-items: center;
@@ -169,7 +238,7 @@ body {
   font: inherit;
   font-size: 13px;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--rule);
   border-radius: 3px;
 }
@@ -208,7 +277,7 @@ body {
   background: var(--cobalt);
   color: #fff;
 }
-.btn--go:hover:not(:disabled) { background: #1B32AE; }
+.btn--go:hover:not(:disabled) { filter: brightness(0.85); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .btn--quiet {
@@ -229,13 +298,14 @@ body {
   margin: 12px 0 0;
   padding: 9px 11px;
   border-left: 3px solid var(--ochre);
-  background: #F7F2E2;
+  background: var(--tint-warn);
+  color: var(--ink);
   font-size: 12.5px;
 }
 
 .notice[data-kind="error"] {
   border-left-color: var(--alarm);
-  background: #F8EAE8;
+  background: var(--tint-error);
 }
 
 /* ------------------------------------------------------------------ sessions */
@@ -305,6 +375,8 @@ body {
   color: #8B9499;
   font-size: 13.5px;
 }
+
+.viewport[hidden] { display: none; } /* author display:grid below otherwise beats the UA default for [hidden] */
 
 .viewport {
   display: grid;

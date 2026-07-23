@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DroidStream</title>
+<script>
+  // Applied before the stylesheet paints anything, so a stored preference
+  // never flashes the wrong theme first. No preference stored -> no
+  // attribute at all -> style.css's prefers-color-scheme query decides.
+  (function () {
+    var t = localStorage.getItem('droidstream:theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  })();
+</script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,6 +29,9 @@
   </dl>
   <input type="password" id="adminToken" class="admin-token" placeholder="admin token (optional)"
          title="Paste the server's ADMIN_TOKEN to see and attach to every session, not just ones this browser started.">
+  <button type="button" class="theme-toggle" id="btnTheme" title="Toggle light/dark theme">
+    <span id="themeIcon">◐</span>
+  </button>
   <div class="rail__state" id="hostState" data-state="unknown">
     <span class="dot"></span><span id="hostStateLabel">connecting</span>
   </div>

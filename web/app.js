@@ -11,7 +11,33 @@ const els = {
   mResolution: $('mResolution'), mFps: $('mFps'), mBitrate: $('mBitrate'), mRtt: $('mRtt'), mDropped: $('mDropped'),
   btnRotate: $('btnRotate'), btnNotifications: $('btnNotifications'), btnStop: $('btnStop'),
   adminToken: $('adminToken'),
+  btnTheme: $('btnTheme'), themeIcon: $('themeIcon'),
 };
+
+// ---------------------------------------------------------------- theme
+//
+// index.html's inline head script already applied any *stored* preference
+// before first paint (avoids a flash). Until the toggle is actually
+// clicked, nothing here writes an explicit choice -- that way a visitor
+// who never touches it keeps following the OS theme live, rather than
+// today's system preference getting silently pinned forever on first load.
+const darkMedia = matchMedia('(prefers-color-scheme: dark)');
+function currentTheme() {
+  return document.documentElement.dataset.theme ?? (darkMedia.matches ? 'dark' : 'light');
+}
+function updateThemeIcon() {
+  els.themeIcon.textContent = currentTheme() === 'dark' ? '☀' : '☾';
+}
+updateThemeIcon();
+darkMedia.addEventListener('change', () => {
+  if (!document.documentElement.dataset.theme) updateThemeIcon(); // no explicit override -> still following the OS
+});
+els.btnTheme.addEventListener('click', () => {
+  const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem('droidstream:theme', next);
+  updateThemeIcon();
+});
 
 // ---------------------------------------------------------------- admin mode
 //
