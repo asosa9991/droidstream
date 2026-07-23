@@ -4,3 +4,4 @@ vendor/
 .env
 gcp/tls/
 gcp/.last-instance
+gcp/json-bridge/__pycache__/

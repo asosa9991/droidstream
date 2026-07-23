@@ -234,6 +234,28 @@ duplicates.
 Needs Pillow in the `json-bridge` image (already added); `?full=1` without
 it returns `501`.
 
+**Light/dark theme:** the app defaults to its original dark look. Add
+`?theme=light` for a light render instead (any other value, or omitting
+it, stays dark):
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"hello":"world"}' \
+  "http://EXTERNAL_IP:8600/api/json?theme=light" \
+  -o screenshot.png
+```
+
+Explicit per call, not sticky — a request with no `theme` param on a
+*reused* session still renders dark, even if the previous call on that
+same session asked for light. This is enforced app-side
+(`json-deeplink-viewer`'s `__loadFromNative()` re-applies theme, from a
+`theme` intent extra, on every single invocation whether it's a cold
+start or a repeat call on an already-running session) — `json-bridge`
+just passes `--es theme light` through when asked. Filmstrip mode's
+gutter color also switches to match. Verified both single-shot and
+`?full=1&theme=light` render correctly and legibly (contrast-appropriate
+syntax colors, not just the dark palette's hues lightened).
+
 Caveat inherited from DroidStream's own design: sessions are reaped after
 5 minutes idle regardless of how `json-bridge` is using them (pure `adb`
 traffic doesn't `touch()` the session the way a WebSocket viewer does), so

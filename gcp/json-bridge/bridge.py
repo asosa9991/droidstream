@@ -109,13 +109,14 @@ def ensure_device_ready(session_id, serial):
     _installed.add(session_id)
 
 
-def show_json_on_device(serial, json_text):
+def show_json_on_device(serial, json_text, theme=None):
     # Same POSIX-single-quote escaping as the Cuttlefish/local sidecars --
     # `adb shell` re-parses its argument through a shell on-device, so a
     # JSON payload full of double quotes gets torn apart otherwise.
     escaped = "'" + json_text.replace("'", "'\\''") + "'"
-    remote_cmd = "am start -W -a android.intent.action.VIEW -d '%s' --es json %s %s" % (
-        DEEPLINK, escaped, COMPONENT
+    theme_extra = " --es theme '%s'" % theme if theme else ""
+    remote_cmd = "am start -W -a android.intent.action.VIEW -d '%s' --es json %s%s %s" % (
+        DEEPLINK, escaped, theme_extra, COMPONENT
     )
     return adb("shell", remote_cmd, serial=serial, timeout=30)
 
@@ -151,7 +152,7 @@ def scroll_to_top(serial, width, height):
         time.sleep(SCROLL_SETTLE_SEC)
 
 
-def capture_filmstrip_png(serial):
+def capture_filmstrip_png(serial, theme=None):
     """Scrolls through the page, capturing one full screenshot per position,
     and lays them out in a grid (FILMSTRIP_COLS per row) rather than trying
     to reconstruct a single seamless page. Much simpler than stitching: no
@@ -178,7 +179,8 @@ def capture_filmstrip_png(serial):
     w, h = frames[0].size
     total_w = cols * w + FILMSTRIP_GUTTER * (cols - 1)
     total_h = rows * h + FILMSTRIP_GUTTER * (rows - 1)
-    filmstrip = Image.new("RGB", (total_w, total_h), (12, 12, 16))  # matches the app's dark bg
+    gutter_color = (244, 245, 240) if theme == "light" else (12, 12, 16)  # matches the app's bg per theme
+    filmstrip = Image.new("RGB", (total_w, total_h), gutter_color)
     for i, f in enumerate(frames):
         col, row = i % cols, i // cols
         filmstrip.paste(f, (col * (w + FILMSTRIP_GUTTER), row * (h + FILMSTRIP_GUTTER)))
@@ -214,9 +216,13 @@ class Handler(BaseHTTPRequestHandler):
         parsed_url = urlparse(self.path)
         if parsed_url.path != "/api/json":
             return self._json(404, {"error": "not found"})
-        filmstrip = parse_qs(parsed_url.query).get("full", ["0"])[0] not in ("0", "", "false")
+        query = parse_qs(parsed_url.query)
+        filmstrip = query.get("full", ["0"])[0] not in ("0", "", "false")
         if filmstrip and not HAVE_PIL:
             return self._json(501, {"error": "filmstrip mode needs Pillow in the json-bridge image"})
+        theme = query.get("theme", [None])[0]
+        if theme not in (None, "light", "dark"):
+            return self._json(400, {"error": "theme must be 'light' or 'dark' if given"})
 
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0:
@@ -240,7 +246,7 @@ class Handler(BaseHTTPRequestHandler):
             session_id = find_or_create_session()
             serial = adb_serial_for(session_id)
             ensure_device_ready(session_id, serial)
-            r = show_json_on_device(serial, normalized)
+            r = show_json_on_device(serial, normalized, theme=theme)
             output = (r.stdout + r.stderr).strip()
             if r.returncode != 0 or "Error:" in output:
                 return self._json(500, {"error": output or "am start failed", "session": session_id})
@@ -248,7 +254,7 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(RENDER_WAIT_SEC)
             frame_count = None
             if filmstrip:
-                png, frame_count = capture_filmstrip_png(serial)
+                png, frame_count = capture_filmstrip_png(serial, theme=theme)
             else:
                 png = screenshot_png(serial)
             if not png:
