@@ -43,6 +43,7 @@ SESSION_WAIT_TIMEOUT_SEC = float(os.environ.get("SESSION_WAIT_TIMEOUT_SEC", "45"
 SCROLL_SETTLE_SEC = float(os.environ.get("SCROLL_SETTLE_SEC", "0.35"))
 MAX_SCROLLS = int(os.environ.get("MAX_SCROLLS", "25"))
 FILMSTRIP_GUTTER = int(os.environ.get("FILMSTRIP_GUTTER", "8"))
+FILMSTRIP_COLS = int(os.environ.get("FILMSTRIP_COLS", "3"))
 
 # Tracks which ephemeral sessions already have the APK installed, so a
 # reused session doesn't reinstall on every request. Cleared implicitly
@@ -152,8 +153,8 @@ def scroll_to_top(serial, width, height):
 
 def capture_filmstrip_png(serial):
     """Scrolls through the page, capturing one full screenshot per position,
-    and lays them out side-by-side (a filmstrip) rather than trying to
-    reconstruct a single seamless page. Much simpler than stitching: no
+    and lays them out in a grid (FILMSTRIP_COLS per row) rather than trying
+    to reconstruct a single seamless page. Much simpler than stitching: no
     overlap/alignment math needed, just "does scrolling still change
     anything" to know when to stop."""
     width, height = screen_size(serial)
@@ -170,13 +171,17 @@ def capture_filmstrip_png(serial):
             break  # nothing changed -> reached the bottom
         frames.append(cur)
 
-    total_w = sum(f.width for f in frames) + FILMSTRIP_GUTTER * (len(frames) - 1)
-    max_h = max(f.height for f in frames)
-    filmstrip = Image.new("RGB", (total_w, max_h), (12, 12, 16))  # matches the app's dark bg
-    x = 0
-    for f in frames:
-        filmstrip.paste(f, (x, 0))
-        x += f.width + FILMSTRIP_GUTTER
+    # All frames share one device resolution, so a uniform grid is exact --
+    # no per-cell size handling needed.
+    cols = min(FILMSTRIP_COLS, len(frames))
+    rows = -(-len(frames) // cols)  # ceil
+    w, h = frames[0].size
+    total_w = cols * w + FILMSTRIP_GUTTER * (cols - 1)
+    total_h = rows * h + FILMSTRIP_GUTTER * (rows - 1)
+    filmstrip = Image.new("RGB", (total_w, total_h), (12, 12, 16))  # matches the app's dark bg
+    for i, f in enumerate(frames):
+        col, row = i % cols, i // cols
+        filmstrip.paste(f, (col * (w + FILMSTRIP_GUTTER), row * (h + FILMSTRIP_GUTTER)))
 
     buf = io.BytesIO()
     filmstrip.save(buf, format="PNG")

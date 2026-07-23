@@ -219,14 +219,17 @@ curl -X POST -H "Content-Type: application/json" \
 Deliberately simpler than a true stitch: no overlap/alignment math needed
 (that's what made the local-emulator API's equivalent feature tricky to
 get right — see `~/android/json-deeplink-viewer/local-server/README.md`).
-Here, each swipe's full screenshot is just placed next to the previous one
-with a small gutter; the only thing that needs detecting is "did scrolling
-change anything," to know when the bottom is reached. Response header
-`X-Filmstrip-Frames` reports how many frames were captured. Verified on a
-120-row payload: 21 frames on this session's 720×1280 profile (smaller
-screen than the local emulator's, hence more frames for the same content),
-`field_000` at the start of frame 0 through `field_119` at the end of the
-last frame, no gaps or duplicates.
+Here, each swipe's full screenshot is placed into a **grid** —
+`FILMSTRIP_COLS` per row (default 3, env-configurable) — with a small
+gutter between cells; the only thing that needs detecting is "did
+scrolling change anything," to know when the bottom is reached. Response
+header `X-Filmstrip-Frames` reports how many frames were captured.
+Verified on a 120-row payload: 21 frames on this session's 720×1280
+profile (smaller screen than the local emulator's, hence more frames for
+the same content), laid out as a 3×7 grid (2176×9008px, matching
+3×720+gutters by 7×1280+gutters exactly), `field_000` at the start of
+frame 0 through `field_119` at the end of the last frame, no gaps or
+duplicates.
 
 Needs Pillow in the `json-bridge` image (already added); `?full=1` without
 it returns `501`.
