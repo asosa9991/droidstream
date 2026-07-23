@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get update && apt-get install -y --no-install-recommends docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
+# Pillow: filmstrip mode (?full=1) only. Single-shot /api/json works without it.
+RUN pip install --no-cache-dir Pillow
+
 WORKDIR /app
 COPY bridge.py ./bridge.py
 COPY assets ./assets

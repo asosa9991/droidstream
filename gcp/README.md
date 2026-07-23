@@ -204,6 +204,33 @@ default), `502` if the control plane itself is unreachable, `500` for
 anything else (session failed to boot, install failed, `am start` failed,
 screenshot failed) — response body names which.
 
+**Scrolling content — filmstrip mode:** a single screenshot only covers one
+viewport. Add `?full=1` to instead scroll through the whole page and get
+back every position **laid out side-by-side** (a filmstrip), rather than
+stitched into one seamless scrolling image:
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d @big-payload.json \
+  "http://EXTERNAL_IP:8600/api/json?full=1" \
+  -o filmstrip.png
+```
+
+Deliberately simpler than a true stitch: no overlap/alignment math needed
+(that's what made the local-emulator API's equivalent feature tricky to
+get right — see `~/android/json-deeplink-viewer/local-server/README.md`).
+Here, each swipe's full screenshot is just placed next to the previous one
+with a small gutter; the only thing that needs detecting is "did scrolling
+change anything," to know when the bottom is reached. Response header
+`X-Filmstrip-Frames` reports how many frames were captured. Verified on a
+120-row payload: 21 frames on this session's 720×1280 profile (smaller
+screen than the local emulator's, hence more frames for the same content),
+`field_000` at the start of frame 0 through `field_119` at the end of the
+last frame, no gaps or duplicates.
+
+Needs Pillow in the `json-bridge` image (already added); `?full=1` without
+it returns `501`.
+
 Caveat inherited from DroidStream's own design: sessions are reaped after
 5 minutes idle regardless of how `json-bridge` is using them (pure `adb`
 traffic doesn't `touch()` the session the way a WebSocket viewer does), so

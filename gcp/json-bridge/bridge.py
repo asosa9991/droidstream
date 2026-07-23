@@ -9,17 +9,27 @@ session if one exists; otherwise creates one and waits for it to boot.
 The APK is installed once per (ephemeral) session -- a fresh redroid
 container never has it pre-baked in.
 
-Zero non-stdlib Python dependencies. Requires `adb` and the `docker` CLI
-(for `docker port` -- the control plane's public API intentionally does not
-expose a session's internal adb port; see gcp/README.md).
+Needs `adb` and the `docker` CLI (for `docker port` -- the control plane's
+public API intentionally does not expose a session's internal adb port;
+see gcp/README.md). Pillow is needed only for `?full=1` (filmstrip mode);
+plain single-shot `/api/json` works with stdlib alone.
 """
+import io
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlparse, parse_qs
+
+try:
+    from PIL import Image, ImageChops
+    HAVE_PIL = True
+except ImportError:
+    HAVE_PIL = False
 
 ADB = os.environ.get("ADB", "adb")
 APK_PATH = os.environ.get("APK_PATH", "/app/assets/app-debug.apk")
@@ -30,6 +40,9 @@ PORT = int(os.environ.get("PORT", "8600"))
 MAX_JSON_BYTES = int(os.environ.get("MAX_JSON_BYTES", str(8 * 1024 * 1024)))
 RENDER_WAIT_SEC = float(os.environ.get("RENDER_WAIT_SEC", "1.2"))
 SESSION_WAIT_TIMEOUT_SEC = float(os.environ.get("SESSION_WAIT_TIMEOUT_SEC", "45"))
+SCROLL_SETTLE_SEC = float(os.environ.get("SCROLL_SETTLE_SEC", "0.35"))
+MAX_SCROLLS = int(os.environ.get("MAX_SCROLLS", "25"))
+FILMSTRIP_GUTTER = int(os.environ.get("FILMSTRIP_GUTTER", "8"))
 
 # Tracks which ephemeral sessions already have the APK installed, so a
 # reused session doesn't reinstall on every request. Cleared implicitly
@@ -112,6 +125,64 @@ def screenshot_png(serial):
     return r.stdout if r.returncode == 0 else None
 
 
+def screen_size(serial):
+    r = adb("shell", "wm size", serial=serial, timeout=10)
+    m = re.search(r"(\d+)x(\d+)", r.stdout)
+    if not m:
+        raise RuntimeError("could not parse `wm size` output: %r" % r.stdout)
+    return int(m.group(1)), int(m.group(2))
+
+
+def swipe_scroll(serial, width, height):
+    x = width // 2
+    y_start, y_end = int(height * 0.85), int(height * 0.20)
+    adb("shell", "input swipe %d %d %d %d 400" % (x, y_start, x, y_end), serial=serial, timeout=10)
+    time.sleep(SCROLL_SETTLE_SEC)
+
+
+def scroll_to_top(serial, width, height):
+    # Best-effort: the app resets its own scroll position on every fresh
+    # payload, but this guards against any other stale scroll state.
+    x = width // 2
+    for _ in range(4):
+        adb("shell", "input swipe %d %d %d %d 400" % (x, int(height * 0.20), x, int(height * 0.85)),
+            serial=serial, timeout=10)
+        time.sleep(SCROLL_SETTLE_SEC)
+
+
+def capture_filmstrip_png(serial):
+    """Scrolls through the page, capturing one full screenshot per position,
+    and lays them out side-by-side (a filmstrip) rather than trying to
+    reconstruct a single seamless page. Much simpler than stitching: no
+    overlap/alignment math needed, just "does scrolling still change
+    anything" to know when to stop."""
+    width, height = screen_size(serial)
+    scroll_to_top(serial, width, height)
+
+    def shot():
+        return Image.open(io.BytesIO(screenshot_png(serial))).convert("RGB")
+
+    frames = [shot()]
+    for _ in range(MAX_SCROLLS):
+        swipe_scroll(serial, width, height)
+        cur = shot()
+        if ImageChops.difference(frames[-1], cur).getbbox() is None:
+            break  # nothing changed -> reached the bottom
+        frames.append(cur)
+
+    total_w = sum(f.width for f in frames) + FILMSTRIP_GUTTER * (len(frames) - 1)
+    max_h = max(f.height for f in frames)
+    filmstrip = Image.new("RGB", (total_w, max_h), (12, 12, 16))  # matches the app's dark bg
+    x = 0
+    for f in frames:
+        filmstrip.paste(f, (x, 0))
+        x += f.width + FILMSTRIP_GUTTER
+
+    buf = io.BytesIO()
+    filmstrip.save(buf, format="PNG")
+    return buf.getvalue(), len(frames)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "droidstream-json-bridge/1.0"
 
@@ -135,8 +206,12 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "not found"})
 
     def do_POST(self):
-        if self.path != "/api/json":
+        parsed_url = urlparse(self.path)
+        if parsed_url.path != "/api/json":
             return self._json(404, {"error": "not found"})
+        filmstrip = parse_qs(parsed_url.query).get("full", ["0"])[0] not in ("0", "", "false")
+        if filmstrip and not HAVE_PIL:
+            return self._json(501, {"error": "filmstrip mode needs Pillow in the json-bridge image"})
 
         length = int(self.headers.get("Content-Length", 0))
         if length <= 0:
@@ -166,7 +241,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._json(500, {"error": output or "am start failed", "session": session_id})
 
             time.sleep(RENDER_WAIT_SEC)
-            png = screenshot_png(serial)
+            frame_count = None
+            if filmstrip:
+                png, frame_count = capture_filmstrip_png(serial)
+            else:
+                png = screenshot_png(serial)
             if not png:
                 return self._json(500, {"error": "screenshot failed", "session": session_id})
         except urllib.error.URLError as e:
@@ -179,6 +258,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(png)))
         self.send_header("X-Json-Bytes", str(len(normalized)))
         self.send_header("X-Session-Id", session_id)
+        if frame_count is not None:
+            self.send_header("X-Filmstrip-Frames", str(frame_count))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(png)
