@@ -299,6 +299,13 @@ curl -s -X DELETE "http://127.0.0.1:8080/api/sessions/$ID"
    session-create test above — the debug log includes every scrcpy
    server line and rejected client message.
 
+6. **Container shows `Up`, but adb reports the device `offline` and
+   `sudo dmesg` shows `binder_linux: undelivered transaction`?** That's a
+   host-kernel binder incompatibility (common on Ubuntu's generic 6.8
+   kernels) — a known, kernel-version-specific redroid issue, not a
+   mistake in your setup. It has its own dedicated fix runbook:
+   **[`docs/BINDER_FIX.md`](BINDER_FIX.md)**.
+
 ---
 
 ## 12. Use it
