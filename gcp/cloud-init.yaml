@@ -1,0 +1,32 @@
+#cloud-config
+#
+# Bootstraps a plain GCE VM to run DroidStream. No nested virtualization,
+# no /dev/kvm — the whole point of DroidStream is that redroid runs Android
+# as a container on the host kernel, so this only needs Docker plus a kernel
+# with binderfs (mainline since 5.0, present in any Ubuntu 22.04+ image).
+#
+# Project files are copied on separately (gcp/deploy.sh) after this VM
+# finishes booting — cloud-init here only prepares the host.
+
+package_update: true
+
+packages:
+  - docker.io
+  - docker-compose-v2
+  - curl
+
+runcmd:
+  - |
+    set -e
+
+    # binderfs is mainline since 5.0 and built into stock Ubuntu kernels, but
+    # the loadable-module path needs linux-modules-extra for the running
+    # kernel on some images. Harmless if it's already built in (apt no-ops,
+    # modprobe is a no-op if the module is already loaded/builtin).
+    apt-get install -y "linux-modules-extra-$(uname -r)" || true
+    modprobe binder_linux devices=binder,hwbinder,vndbinder 2>/dev/null || true
+
+    systemctl enable docker
+    systemctl start docker
+
+    mkdir -p /opt/droidstream

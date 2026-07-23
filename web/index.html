@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DroidStream</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="rail">
+  <div class="rail__mark">
+    <span class="rail__name">DroidStream</span>
+    <span class="rail__sub">remote android</span>
+  </div>
+  <dl class="rail__facts" id="hostFacts">
+    <div><dt>backend</dt><dd id="factBackend">—</dd></div>
+    <div><dt>kvm</dt><dd id="factKvm">—</dd></div>
+    <div><dt>sessions</dt><dd id="factSessions">—</dd></div>
+  </dl>
+  <div class="rail__state" id="hostState" data-state="unknown">
+    <span class="dot"></span><span id="hostStateLabel">connecting</span>
+  </div>
+</header>
+
+<main class="bench">
+
+  <aside class="panel">
+    <section class="panel__block">
+      <h2 class="eyebrow">Start a device</h2>
+
+      <label class="field">
+        <span class="field__label">Android version</span>
+        <select id="selImage"></select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Screen</span>
+        <select id="selProfile"></select>
+      </label>
+
+      <label class="field">
+        <span class="field__label">Runs as</span>
+        <select id="selBackend"></select>
+        <span class="field__hint" id="backendHint"></span>
+      </label>
+
+      <button class="btn btn--go" id="btnStart">Start device</button>
+      <p class="notice" id="startNotice" hidden></p>
+    </section>
+
+    <section class="panel__block panel__block--grow">
+      <h2 class="eyebrow">Running <span class="count" id="sessionCount">0</span></h2>
+      <ul class="sessions" id="sessionList"></ul>
+      <p class="empty" id="sessionEmpty">Nothing running yet. A container takes about 40 seconds to reach the launcher.</p>
+    </section>
+  </aside>
+
+  <section class="stage" id="stage">
+
+    <div class="stage__idle" id="stageIdle">
+      <p class="stage__idleTitle">No device attached</p>
+      <p class="stage__idleBody">Start one on the left, or pick a running session to take it over.</p>
+    </div>
+
+    <div class="viewport" id="viewport" hidden>
+      <!-- Signature element: live decode telemetry drawn beside the screen. -->
+      <canvas class="signal" id="signal" width="56" height="600" aria-hidden="true"></canvas>
+
+      <div class="device">
+        <canvas class="screen" id="screen" tabindex="0"
+                aria-label="Android device screen. Click to focus, then use your keyboard."></canvas>
+        <div class="device__nav">
+          <button class="navbtn" data-nav="back" title="Back">◁</button>
+          <button class="navbtn" data-nav="home" title="Home">○</button>
+          <button class="navbtn" data-nav="appSwitch" title="Recent apps">□</button>
+        </div>
+      </div>
+
+      <dl class="telemetry" id="telemetry">
+        <div><dt>resolution</dt><dd id="mResolution">—</dd></div>
+        <div><dt>fps</dt><dd id="mFps">—</dd></div>
+        <div><dt>bitrate</dt><dd id="mBitrate">—</dd></div>
+        <div><dt>round trip</dt><dd id="mRtt">—</dd></div>
+        <div><dt>dropped</dt><dd id="mDropped">0</dd></div>
+      </dl>
+
+      <div class="stage__actions">
+        <button class="btn btn--quiet" id="btnRotate">Rotate</button>
+        <button class="btn btn--quiet" id="btnNotifications">Notifications</button>
+        <button class="btn btn--stop" id="btnStop">Stop device</button>
+      </div>
+    </div>
+
+    <div class="stage__fault" id="stageFault" hidden>
+      <p class="stage__faultTitle" id="faultTitle">Stream ended</p>
+      <p class="stage__faultBody" id="faultBody"></p>
+    </div>
+
+  </section>
+
+</main>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

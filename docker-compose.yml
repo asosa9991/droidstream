@@ -1,0 +1,81 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: control-plane/Dockerfile
+    # Host networking is deliberate. The control plane talks to each device
+    # container over an ADB port published on the host's loopback interface,
+    # which is unreachable from inside a bridge network. It also keeps the ADB
+    # ports off every other network namespace.
+    network_mode: host
+    volumes:
+      # Sibling-container orchestration: the control plane asks the host's
+      # Docker to start device containers next to it, not inside it.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./vendor:/app/vendor:ro
+    environment:
+      PORT: 8080
+      LOG_LEVEL: info
+      MAX_SESSIONS: 8
+      IDLE_TIMEOUT_MS: 300000
+      SESSION_MEMORY: 3g
+      SESSION_CPUS: "2"
+      VIDEO_MAX_SIZE: 1024
+      VIDEO_BITRATE: 6000000
+      VIDEO_MAX_FPS: 30
+      # Auto-detection (config.js autoBackend()) checks for /dev/binderfs
+      # inside the control-plane's OWN container, which never reflects host
+      # capability -- it's always false there even when the host (verified
+      # via scripts/preflight.sh, which runs on the host directly) has
+      # binderfs. Pin it explicitly rather than relying on that detection.
+      DROIDSTREAM_BACKEND: container
+      # redroid.js's default (--security-opt seccomp=unconfined, no
+      # --privileged) was not enough on this host: mounting binderfs inside
+      # the container needs CAP_SYS_ADMIN, which seccomp=unconfined does not
+      # grant (it only lifts syscall filtering, not capabilities). Without
+      # this the container's /init exits immediately with code 0 and no log
+      # output at all -- confirmed by reproducing the exact `docker run` by
+      # hand outside the control plane. Verified Android actually boots
+      # (sys.boot_completed=1) once privileged.
+      REDROID_PRIVILEGED: "1"
+    restart: unless-stopped
+
+  # TLS termination -- WebCodecs requires a secure context (HTTPS or
+  # localhost); the control plane itself only speaks plain HTTP. See
+  # gcp/nginx-tls.conf for why this exists at all.
+  tls-proxy:
+    image: nginx:1.27-alpine
+    network_mode: host
+    volumes:
+      - ./gcp/nginx-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./gcp/tls:/etc/nginx/tls:ro
+    depends_on:
+      - control-plane
+    restart: unless-stopped
+
+  # Bridges the json-deeplink-viewer app to DroidStream's session pool: POST
+  # JSON, get back a screenshot of it rendered on-device. See gcp/README.md.
+  json-bridge:
+    build:
+      context: ./gcp/json-bridge
+    network_mode: host
+    volumes:
+      # Read-only: only ever runs `docker port <name> 5555/tcp` to resolve a
+      # session's adb port (the control plane's own API doesn't expose it).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      PORT: 8600
+      CONTROL_PLANE_URL: http://127.0.0.1:8080
+    depends_on:
+      - control-plane
+    restart: unless-stopped
+
+  # Warms the image cache so the first session does not wait on a 1.5 GB pull.
+  image-warmer:
+    image: docker:27-cli
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["sh", "-c"]
+    command:
+      - docker pull redroid/redroid:13.0.0_64only-latest
+    restart: "no"

@@ -1,0 +1,394 @@
+/*
+  Bench chrome is light; the device sits in a dark well.
+  A phone screen is a bright emissive object, so it reads best against a dark
+  surround, while the controls around it are easier to scan on paper-toned UI.
+*/
+
+:root {
+  --bench:      #E7E9E1;
+  --bench-deep: #D8DBD1;
+  --paper:      #F4F5F0;
+  --ink:        #14181B;
+  --ink-soft:   #5A625F;
+  --rule:       #C3C8BC;
+
+  --well:       #191D20;
+  --well-edge:  #2B3136;
+
+  --cobalt:     #2540D8;
+  --moss:       #3D6B34;
+  --ochre:      #96700B;
+  --alarm:      #A32B20;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --cond: "Helvetica Neue", "Arial Narrow", "Roboto Condensed", var(--sans);
+
+  --rail-h: 52px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bench);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ------------------------------------------------------------------ top rail */
+
+.rail {
+  height: var(--rail-h);
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+
+.rail__mark { display: flex; align-items: baseline; gap: 10px; }
+
+.rail__name {
+  font-family: var(--cond);
+  font-stretch: condensed;
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+}
+
+.rail__sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rail__facts { display: flex; gap: 26px; margin: 0; flex: 1; }
+.rail__facts div { display: flex; align-items: baseline; gap: 7px; }
+
+.rail__facts dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.rail__facts dd { margin: 0; font-family: var(--mono); font-size: 12px; }
+
+.rail__state {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+}
+
+.rail__state[data-state="ok"]    .dot { background: var(--moss); }
+.rail__state[data-state="busy"]  .dot { background: var(--ochre); }
+.rail__state[data-state="fault"] .dot { background: var(--alarm); }
+
+/* --------------------------------------------------------------------- bench */
+
+.bench {
+  display: grid;
+  grid-template-columns: 288px 1fr;
+  height: calc(100% - var(--rail-h));
+}
+
+.panel {
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.panel__block { padding: 20px; border-bottom: 1px solid var(--rule); }
+.panel__block--grow { flex: 1; border-bottom: none; }
+
+.eyebrow {
+  margin: 0 0 14px;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  display: flex;
+  justify-content: space-between;
+}
+
+.count { color: var(--ink); }
+
+/* -------------------------------------------------------------------- fields */
+
+.field { display: block; margin-bottom: 14px; }
+
+.field__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.field select {
+  width: 100%;
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.field select:focus-visible,
+.btn:focus-visible,
+.screen:focus-visible,
+.sessions button:focus-visible {
+  outline: 2px solid var(--cobalt);
+  outline-offset: 2px;
+}
+
+.field__hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------------- buttons */
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 9px 14px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+
+.btn--go {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--cobalt);
+  color: #fff;
+}
+.btn--go:hover:not(:disabled) { background: #1B32AE; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+
+.btn--quiet {
+  background: transparent;
+  border-color: var(--well-edge);
+  color: #C9D0D3;
+}
+.btn--quiet:hover { background: #23282C; }
+
+.btn--stop {
+  background: transparent;
+  border-color: #6B2A24;
+  color: #E08076;
+}
+.btn--stop:hover { background: #2A1A18; }
+
+.notice {
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  border-left: 3px solid var(--ochre);
+  background: #F7F2E2;
+  font-size: 12.5px;
+}
+
+.notice[data-kind="error"] {
+  border-left-color: var(--alarm);
+  background: #F8EAE8;
+}
+
+/* ------------------------------------------------------------------ sessions */
+
+.sessions { list-style: none; margin: 0; padding: 0; }
+
+.sessions li { border-bottom: 1px solid var(--bench-deep); }
+
+.sessions button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 2px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.sessions button:hover { background: var(--bench-deep); }
+.sessions button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--cobalt); padding-left: 9px; }
+
+.sessions .sid { font-family: var(--mono); font-size: 12px; flex: 1; }
+
+.sessions .st {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.st[data-state="ready"]    { color: var(--moss); }
+.st[data-state="starting"] { color: var(--ochre); }
+.st[data-state="failed"]   { color: var(--alarm); }
+
+.empty { font-size: 12.5px; color: var(--ink-soft); margin: 0; }
+
+/* --------------------------------------------------------------------- stage */
+
+.stage {
+  background: var(--well);
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stage__idle, .stage__fault { text-align: center; max-width: 380px; }
+
+.stage__idleTitle, .stage__faultTitle {
+  font-family: var(--cond);
+  font-stretch: condensed;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #E4E8EA;
+  margin: 0 0 8px;
+}
+
+.stage__faultTitle { color: #E08076; }
+
+.stage__idleBody, .stage__faultBody {
+  margin: 0;
+  color: #8B9499;
+  font-size: 13.5px;
+}
+
+.viewport {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 0 22px;
+  height: 100%;
+}
+
+.signal {
+  grid-row: 1;
+  height: 100%;
+  max-height: 620px;
+  align-self: center;
+}
+
+.device {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.screen {
+  display: block;
+  max-height: calc(100vh - var(--rail-h) - 132px);
+  max-width: 100%;
+  background: #000;
+  border-radius: 4px;
+  border: 1px solid var(--well-edge);
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.device__nav { display: flex; gap: 34px; }
+
+.navbtn {
+  width: 42px; height: 26px;
+  background: none;
+  border: 0;
+  color: #7C868B;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.navbtn:hover { color: #E4E8EA; background: #23282C; }
+.navbtn:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 1px; }
+
+.telemetry {
+  grid-row: 1;
+  margin: 0;
+  align-self: center;
+  min-width: 130px;
+}
+
+.telemetry div { margin-bottom: 14px; }
+
+.telemetry dt {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #6E787D;
+}
+
+.telemetry dd {
+  margin: 1px 0 0;
+  font-family: var(--mono);
+  font-size: 15px;
+  color: #DCE2E4;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage__actions {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 9px;
+  justify-content: center;
+  padding-top: 20px;
+}
+
+/* -------------------------------------------------------------- narrow bench */
+
+@media (max-width: 860px) {
+  .bench { grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: auto; }
+  .panel { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .rail__facts { display: none; }
+  .signal, .telemetry { display: none; }
+  .viewport { grid-template-columns: 1fr; }
+  .screen { max-height: 70vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

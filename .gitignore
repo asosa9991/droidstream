@@ -1,0 +1,6 @@
+node_modules/
+vendor/
+*.log
+.env
+gcp/tls/
+gcp/.last-instance
