@@ -227,6 +227,78 @@ curl -sk https://YOUR_SERVER_IP:8443/api/health
 If that hangs or refuses, it's almost always the firewall step (§10), not
 the application.
 
+**This is not enough to know DroidStream actually works.** All three
+health checks above only prove the three always-on services are up —
+none of them ever create an Android container. The one thing that
+actually exercises the real pipeline (binder/`--privileged`, the
+container image, Android boot, the scrcpy stream) is starting a
+session, and that's worth doing right now, on the server, before you
+ever open a browser — if it's going to fail, better to find out here with
+full logs at hand than from a silent "Starting..." in the web console.
+
+```bash
+# create a session
+SESSION=$(curl -s -X POST http://127.0.0.1:8080/api/sessions -H "Content-Type: application/json" -d "{}")
+ID=$(echo "$SESSION" | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+echo "session id: $ID"
+
+# poll until it's ready (times out after ~3 minutes, matching the server's own boot timeout)
+for i in $(seq 1 60); do
+  STATE=$(curl -s "http://127.0.0.1:8080/api/sessions/$ID" | grep -o '"state":"[^"]*"' | cut -d'"' -f4)
+  echo "[$i] state=$STATE"
+  [ "$STATE" = "ready" ] && { echo "BOOTED OK"; break; }
+  [ "$STATE" = "failed" ] && { echo "FAILED -- see docker compose logs control-plane"; break; }
+  sleep 3
+done
+
+# clean up either way
+curl -s -X DELETE "http://127.0.0.1:8080/api/sessions/$ID"
+```
+
+**If it prints `BOOTED OK`:** the whole pipeline works. Move on to §12.
+
+**If it times out or prints `FAILED`, in this order:**
+
+1. **Check whether the container is still there at all:**
+   ```bash
+   sudo docker ps -a --filter "label=droidstream=session"
+   ```
+   Nothing there? It already crashed and was auto-removed (sessions run
+   with `--rm`) — a crashed-and-removed container is the single most
+   common cause of a boot that "times out" for what looks like no reason.
+
+2. **Check Docker's event log, which persists even for removed containers**
+   (a `create` → `start` → `die` sequence seconds apart confirms an
+   instant crash rather than a genuine slow boot):
+   ```bash
+   sudo docker events --filter "label=droidstream=session" --since 10m --until now
+   ```
+
+3. **Confirm `REDROID_PRIVILEGED` really made it into your compose file** —
+   this exact symptom (container exits immediately, nothing else visibly
+   wrong) is what happens without it, because mounting `binder` inside the
+   container needs `CAP_SYS_ADMIN`, which this project's default
+   `seccomp=unconfined` alone does not grant on many hosts:
+   ```bash
+   grep -A2 REDROID_PRIVILEGED docker-compose.yml
+   ```
+   Should show `REDROID_PRIVILEGED: "1"`. If it's missing, add it under
+   `control-plane`'s `environment:` block and re-run `sudo docker compose
+   up -d --force-recreate control-plane`.
+
+4. **Read the control plane's own log for this session** (look for
+   `"starting container"`, `"device booted"`, or an explicit error — the
+   presence or absence of `"device booted"` tells you whether it's stuck
+   before or after Android's own boot sequence):
+   ```bash
+   sudo docker compose logs control-plane --tail 50
+   ```
+
+5. Still stuck? Bump `LOG_LEVEL: debug` in `docker-compose.yml`, `sudo
+   docker compose up -d --force-recreate control-plane`, and repeat the
+   session-create test above — the debug log includes every scrcpy
+   server line and rejected client message.
+
 ---
 
 ## 12. Use it
