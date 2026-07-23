@@ -23,6 +23,11 @@ services:
       VIDEO_MAX_SIZE: 1024
       VIDEO_BITRATE: 6000000
       VIDEO_MAX_FPS: 30
+      # Every phone session HD by default (1080x1920 @440dpi) -- covers
+      # both the web console (which also explicitly defaults its profile
+      # dropdown to phone-hd in web/app.js) and anything that creates a
+      # session without specifying a profile, e.g. json-bridge.
+      DEFAULT_PROFILE: phone-hd
       # Auto-detection (config.js autoBackend()) checks for /dev/binderfs
       # inside the control-plane's OWN container, which never reflects host
       # capability -- it's always false there even when the host (verified

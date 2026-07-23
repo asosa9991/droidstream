@@ -35,6 +35,7 @@ async function loadCapabilities() {
 
   els.selProfile.innerHTML = Object.entries(capabilities.profiles)
     .map(([k, v]) => `<option value="${k}">${k} — ${v.width}×${v.height} @ ${v.dpi}dpi</option>`).join('');
+  els.selProfile.value = 'phone-hd';
 
   els.selBackend.innerHTML = capabilities.backends
     .map((b) => `<option value="${b.id}"${b.available ? '' : ' disabled'}>${b.label}${b.available ? '' : ' — unavailable here'}</option>`)
